@@ -1,0 +1,48 @@
+#!/bin/sh
+# 解释器引导层。
+#
+# 不用 `#!/usr/bin/env python3`：那会拿到 PATH 上第一个 python3，可能是某个项目
+# venv 的、可能版本过低，而 hook 子进程继承的 PATH 还可能被裁剪过。这里按固定
+# 顺序探测，挑第一个满足最低版本的解释器再 exec，结果在任何机器上都可复现。
+#
+# 覆盖方式：设 MODELRC_PYTHON 指向想用的解释器。
+set -u
+
+MIN_MAJOR=3
+MIN_MINOR=9
+# 用 shell 内建解析自身目录：PATH 被裁剪时外部的 dirname 可能不可用。
+case "$0" in
+    */*) DIR=${0%/*} ;;
+    *)   DIR=. ;;
+esac
+DIR=$(CDPATH= cd -- "$DIR" && pwd) || DIR=.
+ENTRY="$DIR/_modelrc.py"
+
+if [ ! -f "$ENTRY" ]; then
+    echo "modelrc: 找不到入口 $ENTRY，跳过提示词注入" >&2
+    exit 0
+fi
+
+usable() {
+    [ -n "${1:-}" ] || return 1
+    command -v "$1" >/dev/null 2>&1 || return 1
+    "$1" -c "import sys; sys.exit(0 if sys.version_info[:2] >= ($MIN_MAJOR, $MIN_MINOR) else 1)" 2>/dev/null
+}
+
+for candidate in \
+    "${MODELRC_PYTHON:-}" \
+    python3 \
+    /usr/bin/python3 \
+    /opt/homebrew/bin/python3 \
+    /usr/local/bin/python3 \
+    python3.14 python3.13 python3.12 python3.11 python3.10 python3.9 \
+    python
+do
+    if usable "$candidate"; then
+        exec "$candidate" "$ENTRY" "$@"
+    fi
+done
+
+# 找不到可用解释器也绝不能打断会话：报错到 stderr，正常退出，不注入任何内容。
+echo "modelrc: 找不到 python >= $MIN_MAJOR.$MIN_MINOR，跳过提示词注入（可设 MODELRC_PYTHON 指定解释器）" >&2
+exit 0

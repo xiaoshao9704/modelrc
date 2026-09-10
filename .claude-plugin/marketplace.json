@@ -1,0 +1,15 @@
+{
+  "name": "modelrc",
+  "metadata": {
+    "description": "按模型注入提示词的 hook 框架，同时支持 Claude Code 与 Codex"
+  },
+  "owner": {
+    "name": "xiaoshao9704"
+  },
+  "plugins": [
+    {
+      "name": "modelrc",
+      "source": "./"
+    }
+  ]
+}

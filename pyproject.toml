@@ -1,0 +1,22 @@
+[project]
+name = "modelrc"
+version = "0.1.0"
+description = "按模型向 coding agent 注入提示词的 hook 框架"
+requires-python = ">=3.9"
+dependencies = []
+
+[project.scripts]
+modelrc = "modelrc.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/modelrc"]
+
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# 不写 .pytest_cache：插件安装会整目录复制本仓库，不看 .gitignore
+addopts = "-p no:cacheprovider"
