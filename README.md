@@ -91,6 +91,10 @@ Claude adapter 因此在 `model` 为空时，从 `transcript_path` 末尾回溯�
 
 Codex 侧是否有同样的空 model 问题**尚未实测**，其 adapter 暂无回退逻辑。
 
+回退依赖 `transcript_path`。**在与原会话不同的目录里 resume 时**，Claude Code 会按当前
+cwd 推导 project 目录，`transcript_path` 因此指向一个不存在的文件，回退取不到模型名，
+带 `model` 约束的规则不会命中（不会报错，也不会注入）。同目录 resume 不受影响。
+
 `config_dir` 指的是 **agent 自己的配置目录**（`CLAUDE_CONFIG_DIR` / `CODEX_HOME`，取不到时用默认值），
 用于区分同机多套配置。它来自 hook 进程继承的环境变量，不在 hook 入参里。
 
