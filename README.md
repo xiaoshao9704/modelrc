@@ -32,6 +32,15 @@ $MODELRC_PYTHON → python3 → /usr/bin/python3 → /opt/homebrew/bin/python3
 想固定用某个解释器就设 `MODELRC_PYTHON`。一个都找不到时会写 stderr 并以 0 退出，
 不会打断 agent 会话。`modelrc doctor` 会打印当前实际使用的解释器。
 
+### 排查 hook 入参
+
+hook 的 stdin 平时完全不可见。给 agent 进程设 `MODELRC_DEBUG_DUMP=<文件路径>`
+（hook 子进程会继承），每次触发都会把真实入参与归一化后的上下文追加到该文件：
+
+```bash
+MODELRC_DEBUG_DUMP=/tmp/modelrc.jsonl claude -p "..." 
+```
+
 ## 配置
 
 默认目录 `~/.config/modelrc/`，可用 `MODELRC_CONFIG_DIR` 覆盖。

@@ -4,12 +4,34 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
 from . import adapters
 from .context import SESSION_START, HookContext, default_config_dir
 from .rules import RuleError, load_rules, resolve
+
+
+def _debug_dump(env, payload, ctx=None, note=""):
+    """把 hook 真实入参落盘。hook 的 stdin 平时完全不可见，排查全靠它。
+
+    用法：给 agent 进程设 MODELRC_DEBUG_DUMP=<文件路径>，hook 子进程会继承。
+    """
+    path = env.get("MODELRC_DEBUG_DUMP")
+    if not path:
+        return
+    record = {"payload": payload, "note": note}
+    if ctx is not None:
+        record["ctx"] = {
+            "harness": ctx.harness, "event": ctx.event, "native_event": ctx.native_event,
+            "model": ctx.model, "cwd": ctx.cwd, "config_dir": ctx.config_dir,
+        }
+    try:
+        with open(os.path.expanduser(path), "a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+    except OSError:
+        pass
 
 
 def _fail_soft(message):
@@ -40,6 +62,7 @@ def cmd_hook(args, env):
             return _fail_soft("无法判别 agent 形态，可用 --harness 显式指定")
 
     ctx = adapter.parse(payload, env)
+    _debug_dump(env, payload, ctx)
     try:
         text, _hits = resolve(ctx, _config_dir(args))
     except (RuleError, json.JSONDecodeError) as exc:
@@ -149,8 +172,6 @@ def build_parser():
 
 
 def main(argv=None, env=None):
-    import os
-
     args = build_parser().parse_args(argv)
     return args.func(args, env if env is not None else os.environ)
 

@@ -1,7 +1,7 @@
 {
   "name": "modelrc",
   "description": "按当前会话模型向 agent 注入提示词。规则与提示词放在用户配置目录，不随插件分发。",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "author": {
     "name": "xiaoshao9704"
   },
