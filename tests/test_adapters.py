@@ -121,3 +121,90 @@ def test_codex_excludes_model_switch_event():
     """Codex 没有 PostModelSwitch，不能把它写进共用 hooks.json。"""
     assert "PostModelSwitch" not in adapters.by_name("codex").native_events()
     assert "PostModelSwitch" not in adapters.by_name("claude").shared_events()
+
+
+# ---- resume：SessionStart 的 model 为空时从 transcript 回退 ------------------
+#
+# 实测（claude-code 2.1.258）：resume 起来的会话 SessionStart 会触发，但 model 字段
+# 是空的。没有回退的话，带 model 约束的规则在 resume 时会静默不命中。
+
+
+def _transcript(tmp_path, lines):
+    p = tmp_path / "t.jsonl"
+    p.write_text("\n".join(json.dumps(x, ensure_ascii=False) for x in lines), encoding="utf-8")
+    return str(p)
+
+
+def test_resume_falls_back_to_transcript_model(tmp_path):
+    claude = adapters.by_name("claude")
+    path = _transcript(tmp_path, [
+        {"type": "user", "message": {"role": "user"}},
+        {"type": "assistant", "message": {"model": "claude-sonnet-example-5-1"}},
+    ])
+    ctx = claude.parse(
+        {"hook_event_name": "SessionStart", "source": "resume", "cwd": "/tmp",
+         "transcript_path": path},
+        {},
+    )
+    assert ctx.model == "claude-sonnet-example-5-1"
+
+
+def test_transcript_fallback_takes_the_last_model(tmp_path):
+    claude = adapters.by_name("claude")
+    path = _transcript(tmp_path, [
+        {"type": "assistant", "message": {"model": "claude-opus-5"}},
+        {"type": "assistant", "message": {"model": "claude-sonnet-example-5-1"}},
+    ])
+    ctx = claude.parse(
+        {"hook_event_name": "SessionStart", "cwd": "/tmp", "transcript_path": path}, {}
+    )
+    assert ctx.model == "claude-sonnet-example-5-1"
+
+
+def test_explicit_model_wins_over_transcript(tmp_path):
+    claude = adapters.by_name("claude")
+    path = _transcript(tmp_path, [{"type": "assistant", "message": {"model": "old-model"}}])
+    ctx = claude.parse(
+        {"hook_event_name": "SessionStart", "model": "claude-opus-5", "cwd": "/tmp",
+         "transcript_path": path},
+        {},
+    )
+    assert ctx.model == "claude-opus-5"
+
+
+def test_model_switch_does_not_consult_transcript(tmp_path):
+    """切模型事件自带 to_model，不该被 transcript 里的旧模型污染。"""
+    claude = adapters.by_name("claude")
+    path = _transcript(tmp_path, [{"type": "assistant", "message": {"model": "old-model"}}])
+    ctx = claude.parse(
+        {"hook_event_name": "PostModelSwitch", "to_model": "claude-sonnet-example-5-1",
+         "cwd": "/tmp", "transcript_path": path},
+        {},
+    )
+    assert ctx.model == "claude-sonnet-example-5-1"
+
+
+def test_transcript_fallback_survives_bad_input(tmp_path):
+    """transcript 缺失、坏行、无 model 记录，都只能返回空串，不能抛异常。"""
+    claude = adapters.by_name("claude")
+    bad = tmp_path / "broken.jsonl"
+    bad.write_text("not json\n{\"type\":\"user\"}\n", encoding="utf-8")
+    for path in (None, "", str(tmp_path / "missing.jsonl"), str(tmp_path), str(bad)):
+        ctx = claude.parse(
+            {"hook_event_name": "SessionStart", "cwd": "/tmp", "transcript_path": path}, {}
+        )
+        assert ctx.model == "", f"path={path!r} 应回退为空串"
+
+
+def test_transcript_fallback_reads_only_the_tail(tmp_path):
+    """transcript 可能很大，只读尾部；被截断的半行不能让解析失败。"""
+    claude = adapters.by_name("claude")
+    p = tmp_path / "big.jsonl"
+    filler = json.dumps({"type": "user", "message": {"role": "user", "pad": "x" * 2000}})
+    lines = [filler] * 500 + [json.dumps({"type": "assistant", "message": {"model": "tail-model"}})]
+    p.write_text("\n".join(lines), encoding="utf-8")
+    assert p.stat().st_size > 262144
+    ctx = claude.parse(
+        {"hook_event_name": "SessionStart", "cwd": "/tmp", "transcript_path": str(p)}, {}
+    )
+    assert ctx.model == "tail-model"

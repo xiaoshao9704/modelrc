@@ -71,6 +71,17 @@ $MODELRC_PYTHON → python3 → /usr/bin/python3 → /opt/homebrew/bin/python3
 
 可匹配字段：`model`、`harness`、`config_dir`、`cwd`、`event`。
 
+### resume 起来的会话
+
+实测（claude-code 2.1.258）：`resume` / `fork` 起来的会话**会**触发 `SessionStart`，
+但入参里的 `model` 是**空的**。若不处理，带 `model` 约束的规则在 resume 时会静默不命中。
+
+Claude adapter 因此在 `model` 为空时，从 `transcript_path` 末尾回溯取上一次实际使用的
+模型名。若 resume 时切换了模型，`PostModelSwitch`（其 source 枚举包含 `resume`）
+会带 `to_model` 再触发一次，覆盖掉回退值。
+
+Codex 侧是否有同样的空 model 问题**尚未实测**，其 adapter 暂无回退逻辑。
+
 `config_dir` 指的是 **agent 自己的配置目录**（`CLAUDE_CONFIG_DIR` / `CODEX_HOME`，取不到时用默认值），
 用于区分同机多套配置。它来自 hook 进程继承的环境变量，不在 hook 入参里。
 

@@ -33,6 +33,11 @@ class ClaudeAdapter(Adapter):
         native = payload.get("hook_event_name") or SESSION_START_EVENT
         # 切模型后生效的是新模型；SessionStart 才读 model。
         model = payload.get("to_model") if native == MODEL_SWITCH_EVENT else payload.get("model")
+        if not model and native == SESSION_START_EVENT:
+            # resume / fork 起来的会话，SessionStart 的 model 是空的（实测确认），
+            # 此时从 transcript 里回退取上一次实际使用的模型。
+            # 若 resume 时换了模型，PostModelSwitch 会带 to_model 再触发一次修正。
+            model = _model_from_transcript(payload.get("transcript_path"))
         config_dir = Path(env.get("CLAUDE_CONFIG_DIR") or "~/.claude").expanduser()
         return HookContext(
             harness=self.name,
@@ -63,3 +68,37 @@ class ClaudeAdapter(Adapter):
         # PostModelSwitch 是 Claude 独有的，不进共用 hooks.json，
         # 免得 Codex 读到不认识的事件名。它由 .claude-plugin/plugin.json 单独声明。
         return [SESSION_START_EVENT]
+
+
+def _model_from_transcript(path, tail_bytes=262144):
+    """从 transcript 末尾回溯，取最近一条 assistant 记录里的模型名。
+
+    只读文件尾部：transcript 可能很大，而我们只关心最后几条。
+    读不到就返回空串——注入与否交给规则匹配决定，绝不在 hook 里抛异常。
+    """
+    if not path:
+        return ""
+    try:
+        target = Path(path)
+        size = target.stat().st_size
+        with target.open("rb") as handle:
+            if size > tail_bytes:
+                handle.seek(size - tail_bytes)
+                handle.readline()  # 丢弃被截断的半行
+            chunk = handle.read()
+    except OSError:
+        return ""
+
+    for line in reversed(chunk.decode("utf-8", "replace").splitlines()):
+        try:
+            entry = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(entry, dict):
+            continue
+        message = entry.get("message")
+        model = message.get("model") if isinstance(message, dict) else None
+        model = model or entry.get("model")
+        if isinstance(model, str) and model:
+            return model
+    return ""
