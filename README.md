@@ -9,9 +9,14 @@
 ## 安装
 
 ```bash
-claude plugin marketplace add ~/code/modelrc
-codex  plugin marketplace add ~/code/modelrc
+claude plugin marketplace add https://github.com/xiaoshao9704/modelrc.git
+claude plugin install modelrc@modelrc
+
+codex plugin marketplace add https://github.com/xiaoshao9704/modelrc.git
+codex plugin add modelrc@modelrc
 ```
+
+装完还要建配置目录，否则不会注入任何内容（`modelrc doctor` 会提示）。见下方「配置」。
 
 运行时只依赖一个 **python3 ≥ 3.9**，无第三方包。
 
@@ -111,12 +116,29 @@ uv run --no-project --with pytest pytest
 复制进各自的插件缓存，且**不看 `.gitignore`**——`.venv` 会让每次安装多出约 10MB，
 里面还有一份指向源仓库的旧脚本，排查时容易误导。
 
-本地开发改完代码后，两边都需要重装才生效（都是拷贝，不是引用）：
+两边安装时都是**把整个仓库复制**进各自的插件缓存，不是引用源目录，
+所以改完代码必须重新安装才生效。
+
+**发布**（改动已 push）：
 
 ```bash
-claude plugin uninstall modelrc && claude plugin install modelrc@modelrc
-codex plugin add modelrc@modelrc
+claude plugin marketplace update modelrc && claude plugin update modelrc
+codex plugin marketplace upgrade modelrc && codex plugin add modelrc@modelrc
 ```
 
-`claude plugin update` 按版本号判断，版本没变不会重拷；
-`codex plugin marketplace upgrade` 只刷新 Git 类型的 marketplace，本地目录不适用。
+`claude plugin update` 按版本号判断，所以**发布前要先在
+`.claude-plugin/plugin.json` 与 `.codex-plugin/plugin.json` 里同步升版本号**，
+否则它会认为已是最新而不重拷。
+
+**本地迭代**（不想每次都 push）：临时把本地目录加成 marketplace，
+但要注意它会覆盖同名的 Git 源，验完记得换回去。
+
+```bash
+claude plugin marketplace add ~/code/modelrc   # 本地路径源
+# 验证完毕后换回 Git 源
+claude plugin marketplace remove modelrc
+claude plugin marketplace add https://github.com/xiaoshao9704/modelrc.git
+```
+
+注意 `codex plugin marketplace upgrade` **只刷新 Git 类型的 marketplace**，
+本地路径源不适用，那种情况下只能 remove + add。
