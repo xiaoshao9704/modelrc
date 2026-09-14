@@ -26,8 +26,8 @@ class ClaudeAdapter(Adapter):
     def detect(self, payload, env):
         if env.get("CLAUDECODE") == "1" or env.get("CLAUDE_CODE_SESSION_ID"):
             return True
-        # payload 兜底：这几个字段是 Claude Code hook 入参独有的。
-        return any(k in payload for k in ("permission_mode", "prompt_id", "transcript_path"))
+        # permission_mode / transcript_path 两个宿主都有，不能作为判别依据。
+        return "prompt_id" in payload or payload.get("hook_event_name") == MODEL_SWITCH_EVENT
 
     def parse(self, payload, env):
         native = payload.get("hook_event_name") or SESSION_START_EVENT

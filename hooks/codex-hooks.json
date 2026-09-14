@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/modelrc\" hook --harness claude"
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/modelrc\" hook --harness codex"
           }
         ]
       }

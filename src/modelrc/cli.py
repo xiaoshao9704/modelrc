@@ -128,14 +128,11 @@ def cmd_doctor(args, env):
 
 def cmd_manifest(args, env):
     """从 adapter 生成插件清单，保证清单与代码不脱节。"""
-    command = '"${CLAUDE_PLUGIN_ROOT}/bin/modelrc" hook'
-    shared = []
-    for adapter in adapters.ADAPTERS:
-        for event in adapter.shared_events():
-            if event not in shared:
-                shared.append(event)
+    adapter = adapters.by_name(args.harness)
+    command = f'"${{CLAUDE_PLUGIN_ROOT}}/bin/modelrc" hook --harness {adapter.name}'
     hooks = {
-        event: [{"hooks": [{"type": "command", "command": command}]}] for event in shared
+        event: [{"hooks": [{"type": "command", "command": command}]}]
+        for event in adapter.shared_events()
     }
     print(json.dumps({"hooks": hooks}, indent=2, ensure_ascii=False))
     return 0
@@ -165,7 +162,8 @@ def build_parser():
     p = sub.add_parser("doctor", help="自检：配置目录、规则、提示词文件")
     p.set_defaults(func=cmd_doctor)
 
-    p = sub.add_parser("manifest", help="从 adapter 生成共用 hooks.json 内容")
+    p = sub.add_parser("manifest", help="从 adapter 生成宿主 hooks.json 内容")
+    p.add_argument("--harness", choices=[a.name for a in adapters.ADAPTERS], default="claude")
     p.set_defaults(func=cmd_manifest)
 
     return parser
@@ -173,6 +171,13 @@ def build_parser():
 
 def main(argv=None, env=None):
     args = build_parser().parse_args(argv)
+    if args.command == "hook":
+        try:
+            return args.func(args, env if env is not None else os.environ)
+        except Exception as exc:
+            # 宿主入参、环境、文件 IO 或渲染异常统一在 hook 边界兜底。
+            # doctor / resolve 仍保留非零退出码，便于主动排错。
+            return _fail_soft(str(exc))
     return args.func(args, env if env is not None else os.environ)
 
 

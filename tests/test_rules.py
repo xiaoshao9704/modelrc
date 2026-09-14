@@ -39,13 +39,32 @@ def test_model_glob_hit_and_miss(tmp_path):
     assert resolve(ctx(model="claude-opus-5"), tmp_path)[0] == ""
 
 
-def test_missing_model_does_not_match(tmp_path):
+@pytest.mark.parametrize("pattern", ["*sonnet-example*", "*", "", ["*"], []])
+def test_missing_model_does_not_match(tmp_path, pattern):
     write(
         tmp_path,
-        {"10.json": [{"match": {"model": "*sonnet-example*"}, "prompt_file": "prompts/a.md"}]},
+        {"10.json": [{"match": {"model": pattern}, "prompt_file": "prompts/a.md"}]},
         {"a.md": "A"},
     )
     assert resolve(ctx(model=""), tmp_path)[0] == ""
+
+
+@pytest.mark.parametrize("pattern", [42, None, {}, ["*", 42]])
+def test_invalid_match_value_is_rejected(tmp_path, pattern):
+    write(tmp_path, {"10.json": [{"match": {"model": pattern}, "prompt_file": "prompts/a.md"}]}, {"a.md": "A"})
+    with pytest.raises(RuleError, match="match.model"):
+        load_rules(tmp_path)
+
+
+def test_empty_pattern_list_matches_nothing(tmp_path):
+    write(tmp_path, {"10.json": [{"match": {"harness": []}, "prompt_file": "prompts/a.md"}]}, {"a.md": "A"})
+    assert resolve(ctx(), tmp_path)[0] == ""
+
+
+def test_invalid_prompt_path_type_is_rejected(tmp_path):
+    write(tmp_path, {"10.json": [{"prompt_file": 42}]}, {})
+    with pytest.raises(RuleError, match="prompt_file"):
+        load_rules(tmp_path)
 
 
 def test_empty_match_matches_everything(tmp_path):

@@ -1,7 +1,7 @@
 {
   "name": "modelrc",
   "description": "按当前会话模型向 agent 注入提示词。规则与提示词放在用户配置目录，不随插件分发。",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "author": {
     "name": "xiaoshao9704"
   },
@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/modelrc\" hook"
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/modelrc\" hook --harness claude"
           }
         ]
       }

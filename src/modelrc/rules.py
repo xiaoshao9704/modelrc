@@ -28,6 +28,8 @@ class Rule:
     source: Path
 
     def matches(self, ctx: HookContext) -> bool:
+        if "model" in self.match and not ctx.model:
+            return False
         for field_name, pattern in self.match.items():
             value = getattr(ctx, field_name, "")
             if not _match_value(value, pattern):
@@ -49,8 +51,6 @@ def _match_value(value: str, pattern) -> bool:
     用 fnmatch 语义：``*`` 会跨越 ``/``，所以 ``*/work/*`` 能匹配任意深度。
     """
     patterns = pattern if isinstance(pattern, list) else [pattern]
-    if not patterns:
-        return True
     candidates = {value or ""}
     if value and ("/" in value or value.startswith("~")):
         candidates.add(str(Path(value).expanduser()))
@@ -76,6 +76,8 @@ def _parse_rules(payload, source: Path) -> list[Rule]:
         prompt_file = item.get("prompt_file")
         if not prompt_file:
             raise RuleError(f"{where}: 缺少 prompt_file")
+        if not isinstance(prompt_file, str):
+            raise RuleError(f"{where}: prompt_file 应是字符串")
         match = item.get("match", {})
         if not isinstance(match, dict):
             raise RuleError(f"{where}: match 应是对象")
@@ -84,6 +86,11 @@ def _parse_rules(payload, source: Path) -> list[Rule]:
             raise RuleError(
                 f"{where}: match 含未知字段 {sorted(unknown)}，可用字段 {list(MATCH_FIELDS)}"
             )
+        for field_name, pattern in match.items():
+            if not isinstance(pattern, str) and not (
+                isinstance(pattern, list) and all(isinstance(p, str) for p in pattern)
+            ):
+                raise RuleError(f"{where}: match.{field_name} 应是字符串或字符串数组")
         rules.append(
             Rule(
                 name=item.get("name") or f"{source.stem}#{index}",

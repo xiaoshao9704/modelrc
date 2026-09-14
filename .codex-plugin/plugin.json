@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "modelrc",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "author": {
     "name": "xiaoshao9704"
   },
@@ -13,5 +13,5 @@
     "model",
     "routing"
   ],
-  "hooks": {}
+  "hooks": "./hooks/codex-hooks.json"
 }

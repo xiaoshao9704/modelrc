@@ -12,7 +12,7 @@ from modelrc.context import HookContext
 
 ALL = adapters.ADAPTERS
 
-#: 每个 adapter 一份能被自己 detect 的最小 payload，用于契约测试。
+#: 真实宿主入参；共享字段无法区分宿主，自动判别还需要环境信息。
 SAMPLES = {
     "claude": {
         "hook_event_name": "SessionStart",
@@ -28,9 +28,13 @@ SAMPLES = {
         "model": "gpt-6-astra",
         "cwd": "/tmp/proj",
         "session_id": "s1",
-        "turn_id": "t1",
+        "transcript_path": None,
+        "permission_mode": "default",
+        "source": "startup",
     },
 }
+
+SAMPLE_ENVS = {"claude": {"CLAUDECODE": "1"}, "codex": {"CODEX_HOME": "/custom/codex"}}
 
 
 @pytest.mark.parametrize("adapter", ALL, ids=lambda a: a.name)
@@ -46,7 +50,7 @@ def test_has_sample(adapter):
 
 @pytest.mark.parametrize("adapter", ALL, ids=lambda a: a.name)
 def test_detects_own_sample(adapter):
-    assert adapter.detect(SAMPLES[adapter.name], {}) is True
+    assert adapter.detect(SAMPLES[adapter.name], SAMPLE_ENVS[adapter.name]) is True
 
 
 @pytest.mark.parametrize("adapter", ALL, ids=lambda a: a.name)
@@ -54,7 +58,7 @@ def test_does_not_detect_foreign_sample(adapter):
     """判别必须互斥，否则 hook 会用错 adapter 解析。"""
     for name, payload in SAMPLES.items():
         if name != adapter.name:
-            assert adapter.detect(payload, {}) is False, f"{adapter.name} 误认了 {name} 的 payload"
+            assert adapter.detect(payload, SAMPLE_ENVS[name]) is False, f"{adapter.name} 误认了 {name} 的 payload"
 
 
 @pytest.mark.parametrize("adapter", ALL, ids=lambda a: a.name)
@@ -85,7 +89,17 @@ def test_events_are_consistent(adapter):
 
 @pytest.mark.parametrize("adapter", ALL, ids=lambda a: a.name)
 def test_registry_detect_picks_right_adapter(adapter):
-    assert adapters.detect(SAMPLES[adapter.name], {}) is adapter
+    assert adapters.detect(SAMPLES[adapter.name], SAMPLE_ENVS[adapter.name]) is adapter
+
+
+def test_shared_payload_without_host_environment_is_ambiguous():
+    assert adapters.detect(SAMPLES["codex"], {}) is None
+
+
+def test_claude_with_inherited_codex_home():
+    env = {"CLAUDECODE": "1", "CODEX_HOME": "/custom/codex"}
+    assert adapters.detect(SAMPLES["claude"], env).name == "claude"
+    assert not adapters.by_name("codex").detect(SAMPLES["claude"], env)
 
 
 # ---- adapter 各自的特殊行为 ------------------------------------------------

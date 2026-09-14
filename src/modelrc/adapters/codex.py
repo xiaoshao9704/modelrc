@@ -1,11 +1,10 @@
 """Codex adapter。
 
-已核对 codex-cli 0.153.4：
-- 插件 hooks 走 hooks/hooks.json，结构与 Claude Code 同构，事件名同为 PascalCase，
-  且 ${CLAUDE_PLUGIN_ROOT} 变量被显式支持（另有别名 ${PLUGIN_ROOT}）
-- hook 入参含 model / cwd / session_id / turn_id，无 permission_mode
-- 只有 command 类型的 handler 可用（prompt / agent / mcp hooks 尚未支持）
-- 事件集不含 PostModelSwitch
+实测 codex-cli 0.153.4 与桌面版 0.154.0-alpha.6.2：
+- SessionStart 含 model / cwd / session_id / permission_mode / transcript_path，
+  不含 turn_id。共享字段不能用于区分 Claude 与 Codex。
+- 插件通过独立清单显式传入 --harness codex，避免继承环境造成误判。
+- additionalContext 注入 developer 上下文；没有 PostModelSwitch 事件。
 """
 
 from __future__ import annotations
@@ -25,11 +24,12 @@ class CodexAdapter(Adapter):
     name = "codex"
 
     def detect(self, payload, env):
-        # Codex 未确认会向 hook 子进程注入专属环境变量，所以以 payload 特征为准：
-        # 有 turn_id 且没有 Claude 独有字段。
-        if "turn_id" in payload and "permission_mode" not in payload:
-            return True
-        return bool(env.get("CODEX_HOME")) and "permission_mode" not in payload
+        # 自动判别仅用于手动调用；插件入口始终显式指定宿主。
+        if env.get("CLAUDECODE") == "1" or env.get("CLAUDE_CODE_SESSION_ID"):
+            return False
+        if "prompt_id" in payload or payload.get("hook_event_name") == "PostModelSwitch":
+            return False
+        return bool(env.get("CODEX_HOME")) or "turn_id" in payload
 
     def parse(self, payload, env):
         native = payload.get("hook_event_name") or SESSION_START_EVENT

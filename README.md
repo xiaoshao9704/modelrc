@@ -72,7 +72,7 @@ MODELRC_DEBUG_DUMP=/tmp/modelrc.jsonl claude -p "..."
 ```
 
 - `match` 里所有字段都是**与**关系；缺省的字段不做约束；`match: {}` 匹配一切
-- 每个字段的值可以是字符串或字符串数组，数组是**任一命中**
+- 每个字段的值可以是字符串或字符串数组，数组是**任一命中**，空数组不命中
 - 通配用 `fnmatch` 语义，`*` 会跨越 `/`，所以 `*/work/*` 匹配任意深度
 - 模型名为空时，带 `model` 约束的规则不命中
 - **多条规则命中会全部拼接**（按文件名与数组顺序），用空行分隔
@@ -87,9 +87,10 @@ MODELRC_DEBUG_DUMP=/tmp/modelrc.jsonl claude -p "..."
 
 Claude adapter 因此在 `model` 为空时，从 `transcript_path` 末尾回溯取上一次实际使用的
 模型名。若 resume 时切换了模型，`PostModelSwitch`（其 source 枚举包含 `resume`）
-会带 `to_model` 再触发一次，覆盖掉回退值。
+会带 `to_model` 再触发一次，为新模型追加规则。历史上下文中的旧提示词不会被撤销。
 
-Codex 侧是否有同样的空 model 问题**尚未实测**，其 adapter 暂无回退逻辑。
+Codex `SessionStart` 在 CLI 0.153.4 与桌面版内置 0.154.0-alpha.6.2 的启动与 resume 入参中
+已实测有 `model`。若宿主未提供模型名，模型规则不命中，不读取旧 transcript 猜测当前模型。
 
 回退依赖 `transcript_path`。**在与原会话不同的目录里 resume 时**，Claude Code 会按当前
 cwd 推导 project 目录，`transcript_path` 因此指向一个不存在的文件，回退取不到模型名，
@@ -103,7 +104,8 @@ cwd 推导 project 目录，`transcript_path` 因此指向一个不存在的文�
 ```bash
 modelrc doctor                                   # 自检：配置目录、规则、提示词文件
 modelrc resolve --harness claude --model sonnet-example-x # 干跑：打印会注入什么
-modelrc manifest                                 # 从 adapter 生成共用 hooks.json
+modelrc manifest --harness claude                # 生成 Claude SessionStart 清单
+modelrc manifest --harness codex                 # 生成 Codex SessionStart 清单
 modelrc hook                                     # 供 agent 调用，读 stdin JSON
 ```
 
@@ -116,19 +118,43 @@ hook 任何异常都写 stderr 并以 0 退出，不会打断会话。
 | Claude Code | `SessionStart`、`PostModelSwitch` | `model` / `to_model` | `CLAUDE_CONFIG_DIR` |
 | Codex | `SessionStart` | `model` | `CODEX_HOME` |
 
-`PostModelSwitch` 是 Claude 独有的（切模型即时生效），因此不写进共用的 `hooks/hooks.json`，
-而是由 `.claude-plugin/plugin.json` 单独声明，避免 Codex 读到不认识的事件名。
+两个宿主使用独立入口，命令显式传入 `--harness claude` / `--harness codex`：
+
+- Claude 的 `SessionStart` 使用默认 `hooks/hooks.json`，`PostModelSwitch` 由 `.claude-plugin/plugin.json` 追加。
+- Codex 的 `.codex-plugin/plugin.json` 显式指向 `./hooks/codex-hooks.json`。不要写 `"hooks": {}`，它会覆盖默认清单，导致没有 hook 被加载。
+- 两边入参都可能包含 `permission_mode`、`transcript_path`，不能依靠这些字段区分宿主。手动调用未指定 `--harness` 时仅做环境与特有字段判别，无法区分就跳过。
+- Codex 安装或更新后，需要在 hook 管理界面信任当前 hook 定义；`enabled = true` 不等于已经信任。确保 `[features].hooks` 未被关闭。
+- Codex 当前只监听 `SessionStart`，不支持会话中途切模型时即时重选规则。注入内容是追加上下文，不会撤回历史规则。
+
+官方协议：[Codex Hooks](https://learn.chatgpt.com/docs/hooks)。
+
+### GPT-6 Astra 复用规则
+
+在用户配置目录中新建一条规则，并提供适配 Codex 工具名与可用子模型的提示词：
+
+```json
+[
+  {
+    "name": "gpt-6-astra-orchestration",
+    "match": {"model": ["gpt-6-astra", "gpt-6-astra-*"], "harness": "codex"},
+    "prompt_file": "prompts/gpt-6-astra-orchestration.md"
+  }
+]
+```
+
+提示词仍放在用户配置目录中，不随插件分发。
 
 ## 新增一个宿主
 
 1. 在 `src/modelrc/adapters/` 下新建一个 `Adapter` 子类，实现 `detect` / `parse` / `emit` / `native_events`
 2. 在 `src/modelrc/adapters/__init__.py` 的 `ADAPTERS` 里注册
-3. 在 `tests/test_adapters.py` 的 `SAMPLES` 里补一份该宿主的样本 payload
+3. 在 `tests/test_adapters.py` 的 `SAMPLES` / `SAMPLE_ENVS` 里补上真实 payload 与环境样本
 
-契约测试会自动覆盖新 adapter，包括**判别互斥性**（不能误认别家的 payload）。
+契约测试会自动覆盖新 adapter，包括**判别互斥性**（不能误认别家的 payload / 环境组合）。
 核心的规则匹配逻辑不认识任何具体 agent，无需改动。
 
-如果新宿主的挂载事件与现有不同，跑 `modelrc manifest > hooks/hooks.json` 重新生成清单。
+使用 `modelrc manifest --harness <宿主>` 生成独立清单，并在插件 manifest 中显式引用。
+`manifest` 默认生成 Claude 的 SessionStart 清单；Claude 独有事件仍在插件 manifest 中声明。
 
 ## 开发
 
