@@ -1,0 +1,3 @@
+interface:
+  display_name: "Modelrc 使用说明"
+  short_description: "配置按模型注入的提示词规则，验证命中结果并排查 Codex 与 Claude hook"
