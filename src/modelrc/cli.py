@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 from . import adapters
-from .context import SESSION_START, HookContext, default_config_dir
+from .context import SESSION_START, HookContext, apply_role_override, default_config_dir
 from .rules import RuleError, load_rules, resolve
 
 
@@ -26,6 +26,7 @@ def _debug_dump(env, payload, ctx=None, note=""):
         record["ctx"] = {
             "harness": ctx.harness, "event": ctx.event, "native_event": ctx.native_event,
             "model": ctx.model, "cwd": ctx.cwd, "config_dir": ctx.config_dir,
+            "mode": ctx.mode,
         }
     try:
         with open(os.path.expanduser(path), "a", encoding="utf-8") as handle:
@@ -61,7 +62,7 @@ def cmd_hook(args, env):
         if adapter is None:
             return _fail_soft("无法判别 agent 形态，可用 --harness 显式指定")
 
-    ctx = adapter.parse(payload, env)
+    ctx = apply_role_override(adapter.parse(payload, env), env)
     ctx, should_resolve = adapter.prepare_hook(ctx, env)
     _debug_dump(env, payload, ctx, note="" if should_resolve else "skipped")
     if not should_resolve:
@@ -91,6 +92,7 @@ def cmd_resolve(args, env):
         model=args.model,
         cwd=args.cwd or str(Path.cwd()),
         config_dir=args.harness_config_dir or "",
+        mode=args.mode,
     )
     text, hits = resolve(ctx, _config_dir(args))
     if not hits:
@@ -177,6 +179,7 @@ def build_parser():
     p.add_argument("--cwd")
     p.add_argument("--harness-config-dir", help="被匹配的 agent 配置目录（对应 match.config_dir）")
     p.add_argument("--event", default=SESSION_START)
+    p.add_argument("--mode", default="", help="会话形态 interactive / headless / subagent，缺省为未知")
     p.set_defaults(func=cmd_resolve)
 
     p = sub.add_parser("doctor", help="自检：配置目录、规则、提示词文件")

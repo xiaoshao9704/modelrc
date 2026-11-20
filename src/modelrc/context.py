@@ -3,12 +3,21 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 #: 归一化事件名。adapter 负责在自己的原生事件名与这些之间做映射。
 SESSION_START = "session_start"
 MODEL_SWITCH = "model_switch"
+
+#: 归一化会话形态（match.mode）。识别不出时为空串，表示未知。
+INTERACTIVE = "interactive"
+HEADLESS = "headless"
+SUBAGENT = "subagent"
+
+#: 派发方显式声明"这是被派发的执行者"。hook 子进程会继承它，任何宿主都适用。
+ROLE_ENV = "MODELRC_ROLE"
+_ROLE_TO_MODE = {"worker": HEADLESS, "headless": HEADLESS, "subagent": SUBAGENT}
 
 
 @dataclass(frozen=True)
@@ -21,6 +30,13 @@ class HookContext:
     session_id: str = ""
     native_event: str = ""
     raw: dict = field(default_factory=dict, repr=False)
+    mode: str = ""
+
+
+def apply_role_override(ctx: HookContext, env) -> HookContext:
+    """MODELRC_ROLE 优先于 adapter 自己识别出的 mode。未设置或取值未知时原样返回。"""
+    mode = _ROLE_TO_MODE.get((env.get(ROLE_ENV) or "").strip().lower())
+    return replace(ctx, mode=mode) if mode else ctx
 
 
 def default_config_dir() -> Path:

@@ -10,7 +10,7 @@ from pathlib import Path
 from .context import HookContext
 
 #: 允许出现在 match 里的字段，与 HookContext 的同名属性对应。
-MATCH_FIELDS = ("harness", "model", "config_dir", "cwd", "event")
+MATCH_FIELDS = ("harness", "model", "config_dir", "cwd", "event", "mode")
 
 #: 多条规则命中时，按顺序拼接，用空行分隔。
 JOIN = "\n\n"

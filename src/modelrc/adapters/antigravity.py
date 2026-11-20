@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 import os
 import re
+from dataclasses import replace
 from pathlib import Path
 
 from ..context import MODEL_SWITCH, SESSION_START, HookContext
@@ -106,17 +107,8 @@ class AntigravityAdapter(Adapter):
             return ctx, False
 
         _save_conversation_model(state, state_path, conv_id, ctx.model, env)
-        updated = HookContext(
-            harness=ctx.harness,
-            event=MODEL_SWITCH,
-            model=ctx.model,
-            cwd=ctx.cwd,
-            config_dir=ctx.config_dir,
-            session_id=ctx.session_id,
-            native_event=ctx.native_event,
-            raw=ctx.raw,
-        )
-        return updated, True
+        # replace 保留 mode 等其余字段（含 MODELRC_ROLE 覆盖结果）。
+        return replace(ctx, event=MODEL_SWITCH), True
 
     def emit(self, ctx, text):
         if not text:
