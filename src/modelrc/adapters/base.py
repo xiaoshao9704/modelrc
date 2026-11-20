@@ -34,3 +34,11 @@ class Adapter(ABC):
     def shared_events(self):
         """需要写进共用 hooks/hooks.json 的事件。两边都认的放这里。"""
         return self.native_events()
+
+    def prepare_hook(self, ctx, env):
+        """hook 解析前的可选状态/过滤处理，返回 (ctx, should_resolve)。"""
+        return ctx, True
+
+    def emit_empty(self, ctx):
+        """无规则命中或跳过注入时的 stdout。"""
+        return ""

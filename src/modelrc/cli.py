@@ -62,7 +62,13 @@ def cmd_hook(args, env):
             return _fail_soft("无法判别 agent 形态，可用 --harness 显式指定")
 
     ctx = adapter.parse(payload, env)
-    _debug_dump(env, payload, ctx)
+    ctx, should_resolve = adapter.prepare_hook(ctx, env)
+    _debug_dump(env, payload, ctx, note="" if should_resolve else "skipped")
+    if not should_resolve:
+        empty = adapter.emit_empty(ctx)
+        if empty:
+            sys.stdout.write(empty)
+        return 0
     try:
         text, _hits = resolve(ctx, _config_dir(args))
     except (RuleError, json.JSONDecodeError) as exc:
@@ -70,6 +76,10 @@ def cmd_hook(args, env):
 
     if text:
         sys.stdout.write(adapter.emit(ctx, text))
+    else:
+        empty = adapter.emit_empty(ctx)
+        if empty:
+            sys.stdout.write(empty)
     return 0
 
 
@@ -129,6 +139,16 @@ def cmd_doctor(args, env):
 def cmd_manifest(args, env):
     """从 adapter 生成插件清单，保证清单与代码不脱节。"""
     adapter = adapters.by_name(args.harness)
+    if adapter.name == "antigravity":
+        command = "./bin/modelrc hook --harness antigravity"
+        manifest = {
+            "modelrc": {
+                event: [{"type": "command", "command": command, "timeout": 10}]
+                for event in adapter.native_events()
+            }
+        }
+        print(json.dumps(manifest, indent=2, ensure_ascii=False))
+        return 0
     command = f'"${{CLAUDE_PLUGIN_ROOT}}/bin/modelrc" hook --harness {adapter.name}'
     hooks = {
         event: [{"hooks": [{"type": "command", "command": command}]}]

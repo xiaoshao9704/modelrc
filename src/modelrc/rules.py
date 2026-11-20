@@ -32,7 +32,7 @@ class Rule:
             return False
         for field_name, pattern in self.match.items():
             value = getattr(ctx, field_name, "")
-            if not _match_value(value, pattern):
+            if not _match_value(value, pattern, case_insensitive=(field_name == "model")):
                 return False
         return True
 
@@ -45,7 +45,7 @@ class Rule:
         return path.read_text(encoding="utf-8").strip()
 
 
-def _match_value(value: str, pattern) -> bool:
+def _match_value(value: str, pattern, case_insensitive: bool = False) -> bool:
     """glob 匹配。列表表示"任一命中"。路径字段先展开 ~ 再比。
 
     用 fnmatch 语义：``*`` 会跨越 ``/``，所以 ``*/work/*`` 能匹配任意深度。
@@ -57,7 +57,10 @@ def _match_value(value: str, pattern) -> bool:
     for pat in patterns:
         expanded = str(Path(pat).expanduser()) if pat.startswith("~") else pat
         for candidate in candidates:
-            if fnmatch.fnmatch(candidate, expanded):
+            if case_insensitive:
+                if fnmatch.fnmatchcase(candidate.lower(), expanded.lower()):
+                    return True
+            elif fnmatch.fnmatch(candidate, expanded):
                 return True
     return False
 

@@ -29,6 +29,8 @@ class CodexAdapter(Adapter):
             return False
         if "prompt_id" in payload or payload.get("hook_event_name") == "PostModelSwitch":
             return False
+        if "hookEventName" in payload or "conversationId" in payload:
+            return False
         return bool(env.get("CODEX_HOME")) or "turn_id" in payload
 
     def parse(self, payload, env):

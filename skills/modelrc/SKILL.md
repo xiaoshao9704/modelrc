@@ -16,7 +16,7 @@ modelrc 根据宿主传入的当前模型、工作目录等条件，选择用户
 | 目录 | 查找顺序 / 用途 |
 |---|---|
 | modelrc 规则目录 | 命令行全局参数 `--config-dir` → `MODELRC_CONFIG_DIR` → `$XDG_CONFIG_HOME/modelrc` → `~/.config/modelrc` |
-| 宿主配置目录 | Codex 使用 `CODEX_HOME`，默认 `~/.codex`；Claude 使用 `CLAUDE_CONFIG_DIR`，默认 `~/.claude`。这是规则里 `match.config_dir` 匹配的值 |
+| 宿主配置目录 | Codex 使用 `CODEX_HOME`，默认 `~/.codex`；Claude 使用 `CLAUDE_CONFIG_DIR`，默认 `~/.claude`；Antigravity 使用 `ANTIGRAVITY_CONFIG_DIR`，默认 `~/.gemini/config`。这是规则里 `match.config_dir` 匹配的值 |
 
 排查现用环境时，检查实际启动入口及其导出的变量。CLI wrapper 和桌面进程可能使用不同配置，不能只凭当前 shell 推断桌面行为。不要通过迁移宿主目录解决规则问题。
 
@@ -65,7 +65,7 @@ modelrc 根据宿主传入的当前模型、工作目录等条件，选择用户
 
 `resolve` 不会从宿主环境自动填充 `--harness-config-dir`；检查带 `config_dir` 限制的规则时要显式传入。再选一个不应命中的模型或目录验证边界；复制规则后也检查原规则仍然命中。
 
-需要检查 stdout 协议时，将捕获的真实 payload 输入 `hook --harness codex` 或 `hook --harness claude`，并使用对应宿主环境。成功注入会输出 `hookSpecificOutput.additionalContext`。空 stdout 可能是未命中，也可能是错误；hook 运行异常通常写 stderr 并返回 0，所以不能用退出码单独证明成功。
+需要检查 stdout 协议时，将捕获的真实 payload 输入 `hook --harness codex`、`hook --harness claude` 或 `hook --harness antigravity`，并使用对应宿主环境。Claude/Codex 成功注入会输出 `hookSpecificOutput.additionalContext`；Antigravity 成功注入会输出 `injectSteps[0].systemMessage.systemMessage`（跳过/未命中时输出 `{}`）。空 stdout 可能是未命中，也可能是错误；hook 运行异常通常写 stderr 并返回 0，所以不能用退出码单独证明成功。
 
 `doctor` 与 `resolve` 只能证明本地配置及匹配结果。宣称宿主注入成功，还需要观察真实 hook 执行及模型可见上下文或实际请求。
 
@@ -83,6 +83,7 @@ modelrc 根据宿主传入的当前模型、工作目录等条件，选择用户
 
 - Codex 监听 `SessionStart`，中途切模型不会立即重选规则；恢复时使用宿主提供的模型，不从旧 transcript 猜测。
 - Claude 还监听 `PostModelSwitch`；`SessionStart` 缺模型时从 transcript 尾部回退，跨目录 resume 可能因 transcript 路径不存在而失败。
+- Antigravity 监听 `SessionStart` 与 `PreInvocation`：当 `modelName` 为 `"auto"` 或空串时从 `transcriptPath` 尾部解析最新的 `<USER_SETTINGS_CHANGE>` `Model Selection`；通过 `PLUGIN_DATA` 去重使 `PreInvocation` 仅在首次或切模型时触发 `model_switch` 注入；检测到 `<swarm_worker>` 时自动跳过注入。
 - 提示词是追加上下文，更新或删除规则不会撤销已有会话中的旧内容。验证新规则时优先用新会话。
 
 ## 安装、更新与维护

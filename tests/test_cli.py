@@ -27,10 +27,17 @@ def test_codex_plugin_command_selects_host_despite_inherited_claude_env(tmp_path
     assert json.loads(capsys.readouterr().out)["hookSpecificOutput"]["additionalContext"] == "codex context"
 
 
-@pytest.mark.parametrize("harness,filename", [("claude", "hooks.json"), ("codex", "codex-hooks.json")])
-def test_generated_manifest_matches_shipped_file(harness, filename, capsys):
+@pytest.mark.parametrize(
+    "harness,relpath",
+    [
+        ("claude", "hooks/hooks.json"),
+        ("codex", "hooks/codex-hooks.json"),
+        ("antigravity", "hooks.json"),
+    ],
+)
+def test_generated_manifest_matches_shipped_file(harness, relpath, capsys):
     assert main(["manifest", "--harness", harness]) == 0
-    assert json.loads(capsys.readouterr().out) == json.loads((ROOT / "hooks" / filename).read_text())
+    assert json.loads(capsys.readouterr().out) == json.loads((ROOT / relpath).read_text())
 
 
 @pytest.mark.parametrize("failure", ["pattern", "encoding", "parse"])

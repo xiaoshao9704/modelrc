@@ -1,6 +1,6 @@
 # modelrc
 
-按**当前会话模型**向 coding agent 注入提示词的 hook 框架。同一个插件同时支持 Claude Code 与 Codex。
+按**当前会话模型**向 coding agent 注入提示词的 hook 框架。同一个插件同时支持 Claude Code、Codex 与 Antigravity。
 
 解决的问题：写在 `CLAUDE.md` / `AGENTS.md` 里的规则对所有会话生效，无法「只在某个模型下生效」。本插件在会话启动时读取 agent 传给 hook 的模型名，匹配规则后把对应提示词注入上下文。
 
@@ -122,11 +122,16 @@ hook 任何异常都写 stderr 并以 0 退出，不会打断会话。
 |---|---|---|---|
 | Claude Code | `SessionStart`、`PostModelSwitch` | `model` / `to_model` | `CLAUDE_CONFIG_DIR` |
 | Codex | `SessionStart` | `model` | `CODEX_HOME` |
+| Antigravity | `SessionStart`、`PreInvocation` | `modelName`（为 `auto`/空时回溯 `transcriptPath`） | `ANTIGRAVITY_CONFIG_DIR`（默认 `~/.gemini/config`） |
 
-两个宿主使用独立入口，命令显式传入 `--harness claude` / `--harness codex`：
+三个宿主使用独立入口，命令显式传入 `--harness claude` / `--harness codex` / `--harness antigravity`：
 
 - Claude 的 `SessionStart` 使用默认 `hooks/hooks.json`，`PostModelSwitch` 由 `.claude-plugin/plugin.json` 追加。
 - Codex 的 `.codex-plugin/plugin.json` 显式指向 `./hooks/codex-hooks.json`。不要写 `"hooks": {}`，它会覆盖默认清单，导致没有 hook 被加载。
+- Antigravity 原生插件使用根目录 `plugin.json` 与根目录 `hooks.json`，在 `SessionStart` 与 `PreInvocation` 调用 `./bin/modelrc hook --harness antigravity`。
+  - 当 `modelName` 为 `"auto"` 或空串时，从 `transcriptPath` 尾部解析最新的 `<USER_SETTINGS_CHANGE>` `Model Selection` 变更。
+  - 若 `lastUserInput` 或 `transcriptPath` 头部包含 `<swarm_worker>`，自动跳过注入（输出 `{}`），避免向委派的 worker 注入主会话提示词。
+  - 通过 `PLUGIN_DATA`（回退 `~/.cache/modelrc` 或 `/tmp/modelrc-state`）按 `conversationId` 记录上次模型，使 `PreInvocation` 仅在首次或模型切换时注入（输出 `injectSteps`），其余回合返回 `{}`。
 - 两边入参都可能包含 `permission_mode`、`transcript_path`，不能依靠这些字段区分宿主。手动调用未指定 `--harness` 时仅做环境与特有字段判别，无法区分就跳过。
 - Codex 安装或更新后，需要在 hook 管理界面信任当前 hook 定义；`enabled = true` 不等于已经信任。确保 `[features].hooks` 未被关闭。
 - Codex 当前只监听 `SessionStart`，不支持会话中途切模型时即时重选规则。注入内容是追加上下文，不会撤回历史规则。

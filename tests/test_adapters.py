@@ -32,9 +32,23 @@ SAMPLES = {
         "permission_mode": "default",
         "source": "startup",
     },
+    "antigravity": {
+        "conversationId": "conv-1",
+        "workspacePaths": ["/tmp/proj"],
+        "transcriptPath": "/tmp/t.jsonl",
+        "artifactDirectoryPath": "/tmp/artifacts",
+        "modelName": "Gemini 4 Carbon (Medium)",
+        "lastUserInput": "Hello",
+        "hookEventName": "SessionStart",
+        "cwd": "/tmp/proj",
+    },
 }
 
-SAMPLE_ENVS = {"claude": {"CLAUDECODE": "1"}, "codex": {"CODEX_HOME": "/custom/codex"}}
+SAMPLE_ENVS = {
+    "claude": {"CLAUDECODE": "1"},
+    "codex": {"CODEX_HOME": "/custom/codex"},
+    "antigravity": {"ANTIGRAVITY_CONFIG_DIR": "/custom/agy"},
+}
 
 
 @pytest.mark.parametrize("adapter", ALL, ids=lambda a: a.name)
@@ -76,8 +90,11 @@ def test_parse_normalizes(adapter):
 def test_emit_roundtrip(adapter):
     ctx = adapter.parse(SAMPLES[adapter.name], {})
     out = json.loads(adapter.emit(ctx, "多行\n提示词"))
-    assert out["hookSpecificOutput"]["hookEventName"] == "SessionStart"
-    assert out["hookSpecificOutput"]["additionalContext"] == "多行\n提示词"
+    if adapter.name == "antigravity":
+        assert out == {"injectSteps": [{"systemMessage": {"systemMessage": "多行\n提示词"}}]}
+    else:
+        assert out["hookSpecificOutput"]["hookEventName"] == "SessionStart"
+        assert out["hookSpecificOutput"]["additionalContext"] == "多行\n提示词"
 
 
 @pytest.mark.parametrize("adapter", ALL, ids=lambda a: a.name)

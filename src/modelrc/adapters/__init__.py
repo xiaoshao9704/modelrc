@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from .antigravity import AntigravityAdapter
 from .base import Adapter
 from .claude import ClaudeAdapter
 from .codex import CodexAdapter
 
-ADAPTERS = [ClaudeAdapter(), CodexAdapter()]
+ADAPTERS = [ClaudeAdapter(), CodexAdapter(), AntigravityAdapter()]
 
 __all__ = ["Adapter", "ADAPTERS", "by_name", "detect"]
 

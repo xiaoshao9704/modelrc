@@ -1,11 +1,11 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "modelrc",
-  "version": "0.1.5",
+  "version": "0.2.0",
   "author": {
     "name": "xiaoshao9704"
   },
-  "description": "按当前会话模型向 agent 注入提示词。规则与提示词放在用户配置目录，不随插件分发。",
+  "description": "按当前会话模型向 agent 动态注入提示词（支持 Claude Code、Codex、Antigravity）。规则与提示词放在用户配置目录，不随插件分发。",
   "license": "MIT",
   "keywords": [
     "hooks",

@@ -1,0 +1,18 @@
+{
+  "modelrc": {
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "./bin/modelrc hook --harness antigravity",
+        "timeout": 10
+      }
+    ],
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "./bin/modelrc hook --harness antigravity",
+        "timeout": 10
+      }
+    ]
+  }
+}
