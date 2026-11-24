@@ -28,7 +28,8 @@ modelrc 根据宿主传入的当前模型、工作目录等条件，选择用户
 
 - `rules.json` 最先加载，其后按文件名排序加载 `rules.d/*.json`，每个文件内按数组顺序处理。
 - 规则文件接受数组，或 `{"rules": [...]}`。多条命中会全部拼接，不会按名称覆盖，也不是第一条命中即停止。
-- `match` 支持 `model`、`harness`、`config_dir`、`cwd`、`event`。字段之间为 AND；字符串数组内部为 OR；空数组不命中。
+- `match` 支持 `model`、`harness`、`config_dir`、`cwd`、`event`、`host`。字段之间为 AND；字符串数组内部为 OR；空数组不命中。
+- `host` 表示拉起会话的外部宿主。hook 进程的 `ORCA_AGENT_SESSION_ID` 去掉首尾空白后非空时取 `"orca"`，否则取 `""`。在 `match` 中加 `"host": [""]` 可排除 Orca 拉起的会话。
 - 缺省字段不限制，`match: {}` 匹配所有上下文。模型名为空时，任何带 `model` 条件的规则均不命中，包括 `"*"`。
 - 匹配使用 glob / `fnmatch`，不是正则；`*` 会跨越 `/`，路径模式中的 `~` 会展开。
 - `event` 使用归一化值 `session_start` 或 `model_switch`，不是宿主事件名 `SessionStart`。

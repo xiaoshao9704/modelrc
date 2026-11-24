@@ -1,6 +1,6 @@
 [project]
 name = "modelrc"
-version = "0.2.0"
+version = "0.3.0"
 description = "按模型向 coding agent 注入提示词的 hook 框架"
 requires-python = ">=3.9"
 dependencies = []

@@ -5,7 +5,7 @@ import json
 
 import pytest
 
-from modelrc import adapters
+from modelrc import adapters, context
 from modelrc.adapters.codex import _mode_from_transcript
 from modelrc.cli import main
 from modelrc.context import HEADLESS, INTERACTIVE, SESSION_START, SUBAGENT, HookContext, apply_role_override
@@ -66,6 +66,17 @@ def test_role_override(role, expected):
     assert apply_role_override(_ctx(INTERACTIVE), env).mode == expected
 
 
+@pytest.mark.parametrize(
+    "env,expected",
+    [({"ORCA_AGENT_SESSION_ID": " session "}, "orca"),
+     ({"ORCA_AGENT_SESSION_ID": ""}, ""),
+     ({"ORCA_AGENT_SESSION_ID": " \t "}, ""),
+     ({}, "")],
+)
+def test_apply_host(env, expected):
+    assert context.apply_host(_ctx(), env).host == expected
+
+
 def _rules(tmp_path, match):
     (tmp_path / "rules.json").write_text(json.dumps([{"name": "r", "match": match, "prompt_file": "p.md"}]))
     (tmp_path / "p.md").write_text("P")
@@ -83,6 +94,17 @@ def test_rule_without_mode_still_matches_everything(tmp_path):
     _rules(tmp_path, {"harness": "codex"})
     for mode in (INTERACTIVE, HEADLESS, SUBAGENT, ""):
         assert resolve(_ctx(mode), tmp_path)[0] == "P"
+
+
+@pytest.mark.parametrize(
+    "match,orca_text",
+    [({"host": [""]}, ""), ({"harness": "codex"}, "P")],
+)
+def test_rule_host_match(tmp_path, match, orca_text):
+    _rules(tmp_path, match)
+    ctx = _ctx()
+    assert resolve(ctx, tmp_path)[0] == "P"
+    assert resolve(context.apply_host(ctx, {"ORCA_AGENT_SESSION_ID": "session"}), tmp_path)[0] == orca_text
 
 
 def _hook(tmp_path, monkeypatch, capsys, harness, payload, env):
@@ -109,6 +131,24 @@ def test_hook_role_env_skips_antigravity(tmp_path, monkeypatch, capsys):
     assert "injectSteps" in _hook(tmp_path, monkeypatch, capsys, "antigravity", payload, env)
     assert _hook(tmp_path, monkeypatch, capsys, "antigravity", payload,
                  dict(env, MODELRC_ROLE="worker")) == "{}"
+
+
+@pytest.mark.parametrize(
+    "harness,payload,injected,empty",
+    [
+        ("claude", {"hook_event_name": "SessionStart", "model": "m"},
+         {"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": "P"}}, ""),
+        ("codex", {"hook_event_name": "SessionStart", "model": "m"},
+         {"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": "P"}}, ""),
+        ("antigravity", {"hookEventName": "SessionStart", "modelName": "m"},
+         {"injectSteps": [{"systemMessage": {"systemMessage": "P"}}]}, "{}"),
+    ],
+)
+def test_hook_host_excludes_orca(tmp_path, monkeypatch, capsys, harness, payload, injected, empty):
+    _rules(tmp_path, {"host": [""]})
+    assert json.loads(_hook(tmp_path, monkeypatch, capsys, harness, payload, {})) == injected
+    assert _hook(tmp_path, monkeypatch, capsys, harness, payload,
+                 {"ORCA_AGENT_SESSION_ID": "session"}) == empty
 
 
 def test_resolve_cli_accepts_mode(tmp_path, capsys):

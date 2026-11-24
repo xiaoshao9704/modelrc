@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 from . import adapters
-from .context import SESSION_START, HookContext, apply_role_override, default_config_dir
+from .context import SESSION_START, HookContext, apply_host, apply_role_override, default_config_dir
 from .rules import RuleError, load_rules, resolve
 
 
@@ -63,6 +63,7 @@ def cmd_hook(args, env):
             return _fail_soft("无法判别 agent 形态，可用 --harness 显式指定")
 
     ctx = apply_role_override(adapter.parse(payload, env), env)
+    ctx = apply_host(ctx, env)
     ctx, should_resolve = adapter.prepare_hook(ctx, env)
     _debug_dump(env, payload, ctx, note="" if should_resolve else "skipped")
     if not should_resolve:

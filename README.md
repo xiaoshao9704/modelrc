@@ -69,7 +69,8 @@ MODELRC_DEBUG_DUMP=/tmp/modelrc.jsonl claude -p "..."
       "model": "*sonnet-example*",
       "harness": ["claude", "codex"],
       "config_dir": "*/.claude-private",
-      "cwd": "*/work/*"
+      "cwd": "*/work/*",
+      "host": [""]
     },
     "prompt_file": "prompts/sonnet-example-orchestration.md"
   }
@@ -83,7 +84,11 @@ MODELRC_DEBUG_DUMP=/tmp/modelrc.jsonl claude -p "..."
 - **多条规则命中会全部拼接**（按文件名与数组顺序），用空行分隔
 - `prompt_file` 相对配置目录解析
 
-可匹配字段：`model`、`harness`、`config_dir`、`cwd`、`event`。
+可匹配字段：`model`、`harness`、`config_dir`、`cwd`、`event`、`host`。
+
+`host` 表示拉起会话的外部宿主。hook 进程中的 `ORCA_AGENT_SESSION_ID` 去掉首尾空白后非空时，
+`host` 为 `"orca"`，否则为 `""`（未知或无宿主）。上例在 `match` 中加入 `"host": [""]`，
+因此 Orca 拉起的会话不会注入这条规则的提示词。
 
 ### resume 起来的会话
 

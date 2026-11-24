@@ -31,12 +31,19 @@ class HookContext:
     native_event: str = ""
     raw: dict = field(default_factory=dict, repr=False)
     mode: str = ""
+    host: str = ""
 
 
 def apply_role_override(ctx: HookContext, env) -> HookContext:
     """MODELRC_ROLE 优先于 adapter 自己识别出的 mode。未设置或取值未知时原样返回。"""
     mode = _ROLE_TO_MODE.get((env.get(ROLE_ENV) or "").strip().lower())
     return replace(ctx, mode=mode) if mode else ctx
+
+
+def apply_host(ctx: HookContext, env) -> HookContext:
+    """根据 hook 进程继承的环境变量识别外部宿主。"""
+    host = "orca" if (env.get("ORCA_AGENT_SESSION_ID") or "").strip() else ""
+    return replace(ctx, host=host)
 
 
 def default_config_dir() -> Path:
