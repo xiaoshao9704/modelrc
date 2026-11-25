@@ -151,6 +151,31 @@ def test_hook_host_excludes_orca(tmp_path, monkeypatch, capsys, harness, payload
                  {"ORCA_AGENT_SESSION_ID": "session"}) == empty
 
 
+@pytest.mark.parametrize(
+    "env,expected",
+    [({"ORCA_AGENT_SESSION_ID": "s", "ORCA_TERMINAL_HANDLE": "structworker_abc"}, context.WORKER),
+     ({"ORCA_AGENT_SESSION_ID": "s", "ORCA_TERMINAL_HANDLE": "term_abc"}, INTERACTIVE),
+     ({"ORCA_AGENT_SESSION_ID": "s"}, INTERACTIVE),
+     ({"ORCA_TERMINAL_HANDLE": "structworker_abc"}, INTERACTIVE)],
+)
+def test_apply_host_detects_orca_worker(env, expected):
+    assert context.apply_host(_ctx(INTERACTIVE), env).mode == expected
+
+
+@pytest.mark.parametrize("harness,payload,injected,empty", [
+    ("claude", {"hook_event_name": "SessionStart", "model": "m"}, "additionalContext", ""),
+    ("codex", {"hook_event_name": "SessionStart", "model": "m"}, "additionalContext", ""),
+    ("antigravity", {"hookEventName": "SessionStart", "modelName": "m"}, "injectSteps", "{}"),
+])
+def test_hook_orca_main_injects_worker_skips(tmp_path, monkeypatch, capsys, harness, payload, injected, empty):
+    _rules(tmp_path, {"host": ["orca"], "mode": ["interactive", ""]})
+    main_env = {"ORCA_AGENT_SESSION_ID": "s", "PLUGIN_DATA": str(tmp_path / "d1")}
+    assert injected in _hook(tmp_path, monkeypatch, capsys, harness, payload, main_env)
+    worker_env = {"ORCA_AGENT_SESSION_ID": "s", "ORCA_TERMINAL_HANDLE": "structworker_x",
+                  "PLUGIN_DATA": str(tmp_path / "d2")}
+    assert _hook(tmp_path, monkeypatch, capsys, harness, payload, worker_env) == empty
+
+
 def test_resolve_cli_accepts_mode(tmp_path, capsys):
     _rules(tmp_path, {"mode": ["interactive", ""]})
     assert main(["--config-dir", str(tmp_path), "resolve", "--harness", "codex", "--model", "m",

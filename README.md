@@ -84,11 +84,17 @@ MODELRC_DEBUG_DUMP=/tmp/modelrc.jsonl claude -p "..."
 - **多条规则命中会全部拼接**（按文件名与数组顺序），用空行分隔
 - `prompt_file` 相对配置目录解析
 
-可匹配字段：`model`、`harness`、`config_dir`、`cwd`、`event`、`host`。
+可匹配字段：`model`、`harness`、`config_dir`、`cwd`、`event`、`mode`、`host`。
 
 `host` 表示拉起会话的外部宿主。hook 进程中的 `ORCA_AGENT_SESSION_ID` 去掉首尾空白后非空时，
 `host` 为 `"orca"`，否则为 `""`（未知或无宿主）。上例在 `match` 中加入 `"host": [""]`，
 因此 Orca 拉起的会话不会注入这条规则的提示词。
+
+`mode` 表示会话形态：`interactive`、`headless`、`subagent`、`worker`，识别不出时为 `""`。
+在 Orca 中，hook 进程的 `ORCA_TERMINAL_HANDLE` 以 `structworker_` 开头时（Orca 派发的结构化
+worker），`mode` 记为 `"worker"`。只想给 Orca 主会话注入、不给 worker 注入时，用
+`"mode": ["interactive", ""]`，并且不要加 `"host": [""]`。终端模式（PTY）的 worker 与用户自开终端
+在环境变量上无法区分，仍按主会话处理。
 
 ### resume 起来的会话
 

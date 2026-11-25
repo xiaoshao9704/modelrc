@@ -180,7 +180,7 @@ def build_parser():
     p.add_argument("--cwd")
     p.add_argument("--harness-config-dir", help="被匹配的 agent 配置目录（对应 match.config_dir）")
     p.add_argument("--event", default=SESSION_START)
-    p.add_argument("--mode", default="", help="会话形态 interactive / headless / subagent，缺省为未知")
+    p.add_argument("--mode", default="", help="会话形态 interactive / headless / subagent / worker，缺省为未知")
     p.set_defaults(func=cmd_resolve)
 
     p = sub.add_parser("doctor", help="自检：配置目录、规则、提示词文件")

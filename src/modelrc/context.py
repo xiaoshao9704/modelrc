@@ -14,6 +14,11 @@ MODEL_SWITCH = "model_switch"
 INTERACTIVE = "interactive"
 HEADLESS = "headless"
 SUBAGENT = "subagent"
+#: 外部编排宿主派发的执行者（目前为 Orca worker）。
+WORKER = "worker"
+
+#: Orca 给结构化 worker 预分配的终端句柄前缀；主会话与用户自开的终端没有这个前缀。
+_ORCA_WORKER_HANDLE_PREFIX = "structworker_"
 
 #: 派发方显式声明"这是被派发的执行者"。hook 子进程会继承它，任何宿主都适用。
 ROLE_ENV = "MODELRC_ROLE"
@@ -41,9 +46,12 @@ def apply_role_override(ctx: HookContext, env) -> HookContext:
 
 
 def apply_host(ctx: HookContext, env) -> HookContext:
-    """根据 hook 进程继承的环境变量识别外部宿主。"""
-    host = "orca" if (env.get("ORCA_AGENT_SESSION_ID") or "").strip() else ""
-    return replace(ctx, host=host)
+    """根据 hook 进程继承的环境变量识别外部宿主；Orca 派发的 worker 的 mode 记为 worker。"""
+    if not (env.get("ORCA_AGENT_SESSION_ID") or "").strip():
+        return replace(ctx, host="")
+    handle = (env.get("ORCA_TERMINAL_HANDLE") or "").strip()
+    mode = WORKER if handle.startswith(_ORCA_WORKER_HANDLE_PREFIX) else ctx.mode
+    return replace(ctx, host="orca", mode=mode)
 
 
 def default_config_dir() -> Path:
